@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration Recettes NFC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        #loginPage { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 100%; max-width: 400px; }
+        .login-card h1 { color: #333; margin-bottom: 30px; text-align: center; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #555; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border-color 0.3s; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: #667eea; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-secondary { background: #757575; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn-info { background: #2196f3; color: white; }
+        .error-message { background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        #adminPage { display: none; }
+        .header { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header h1 { color: #333; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .tabs { background: white; padding: 0; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; overflow: hidden; }
+        .tab { flex: 1; padding: 20px; background: white; border: none; cursor: pointer; font-size: 16px; font-weight: 600; color: #757575; transition: all 0.3s; border-bottom: 3px solid transparent; }
+        .tab:hover { background: #f5f5f5; }
+        .tab.active { color: #667eea; border-bottom: 3px solid #667eea; background: #f9f9ff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card h3 { font-size: 36px; color: #667eea; margin-bottom: 5px; }
+        .stat-card p { color: #757575; }
+        .content { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+        th { background: #f5f5f5; font-weight: 600; color: #555; }
+        tr:hover { background: #f9f9f9; }
+        .action-buttons { display: flex; gap: 5px; }
+        .btn-small { padding: 6px 12px; font-size: 14px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; }
+        .badge { display: inline-block; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #e8f5e9; color: #4caf50; }
+        .badge-danger { background: #ffebee; color: #f44336; }
+        .badge-warning { background: #fff3e0; color: #ff9800; }
+        .badge-info { background: #e3f2fd; color: #2196f3; }
+        .badge-utensil { background: #e8eaf6; color: #3f51b5; }
+        .badge-appliance { background: #fce4ec; color: #e91e63; }
+        .badge-container { background: #e0f2f1; color: #009688; }
+        .badge-cookware { background: #fff3e0; color: #ff9800; }
+        .badge-measuring { background: #f3e5f5; color: #9c27b0; }
+        .badge-other { background: #f5f5f5; color: #757575; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; overflow-y: auto; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; margin: 20px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { color: #333; }
+        .close { font-size: 30px; cursor: pointer; color: #999; }
+        .close:hover { color: #333; }
+        .dynamic-list { list-style: none; padding: 0; }
+        .dynamic-list li { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .dynamic-list input, .dynamic-list textarea { flex: 1; }
+        .remove-btn { background: #f44336; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: 600; }
+        .tag-checkbox { display: inline-block; margin-right: 15px; margin-bottom: 10px; }
+        .tag-checkbox input { margin-right: 5px; }
+        .user-detail { background: #f9f9f9; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .user-detail h4 { margin-bottom: 10px; color: #667eea; }
+        .recipes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+        .recipe-card { background: white; padding: 15px; border-radius: 8px; border: 2px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .recipe-card.unlocked { border-color: #4caf50; background: #f1f8f4; }
+        .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-top: 10px; }
+        .checkbox-item { background: #f9f9f9; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+        .checkbox-item input[type="checkbox"] { width: auto; margin: 0; }
+        
+        /* Styles pour le matériel */
+        .materiel-card { background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; transition: all 0.3s; }
+        .materiel-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: #667eea; }
+        .materiel-card img { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; background: #f5f5f5; }
+        .materiel-card h4 { color: #333; margin-bottom: 5px; }
+        .materiel-card p { color: #666; font-size: 13px; margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .materiel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+        .search-box { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; margin-bottom: 15px; }
+        .filter-buttons { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 16px; border: 2px solid #e0e0e0; background: white; border-radius: 20px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
+        .filter-btn.active { background: #667eea; color: white; border-color: #667eea; }
+        .filter-btn:hover { border-color: #667eea; }
+
+        /* Nouveaux styles pour la sélection de matériel dans les recettes */
+        .modal-content-large { max-width: 1200px; }
+        .materiel-selection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; max-height: 60vh; overflow-y: auto; padding: 10px; }
+        .materiel-tile { background: white; border: 3px solid #e0e0e0; border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.3s; text-align: center; }
+        .materiel-tile:hover { border-color: #667eea; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .materiel-tile.selected { border-color: #4caf50; background: #f1f8f4; }
+        .materiel-tile img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: #f5f5f5; }
+        .materiel-tile h5 { color: #333; margin-bottom: 4px; font-size: 14px; }
+        .materiel-tile .category-badge { font-size: 11px; padding: 3px 8px; }
+        .selected-materiel-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; min-height: 40px; padding: 10px; background: #f9f9f9; border-radius: 8px; }
+        .selected-materiel-item { display: inline-flex; align-items: center; gap: 8px; background: white; padding: 8px 12px; border-radius: 20px; border: 2px solid #667eea; }
+        .selected-materiel-item span { font-size: 14px; color: #333; }
+        .selected-materiel-item button { background: #f44336; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .selected-materiel-item button:hover { background: #d32f2f; }
+    </style>
+</head>
+<body>
+    <div id="loginPage">
+        <div class="login-card">
+            <h1>🔐 Administration</h1>
+            <div id="loginError" class="error-message"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Nom d'utilisateur</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="adminPage">
+        <div class="container">
+            <div class="header">
+                <h1>🍳 Administration Recettes NFC</h1>
+                <div class="user-info">
+                    <span>👤 <strong id="username-display">Admin</strong></span>
+                    <button class="btn btn-danger" style="width: auto; padding: 8px 16px;" onclick="logout()">Déconnexion</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('dashboard')">📊 Tableau de bord</button>
+                <button class="tab" onclick="switchTab('recipes')">🍽️ Recettes</button>
+                <button class="tab" onclick="switchTab('materiel')">🔪 Matériel</button>
+                <button class="tab" onclick="switchTab('users')">👥 Utilisateurs</button>
+            </div>
+
+            <div id="dashboardTab" class="tab-content active">
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3 id="totalRecipes">0</h3>
+                        <p>Recettes totales</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalUsers">0</h3>
+                        <p>Utilisateurs</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalTags">0</h3>
+                        <p>Tags</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="totalMateriel">0</h3>
+                        <p>Matériels</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="recipesTab" class="tab-content">
+                <div class="content">
+                    <div class="actions">
+                        <button class="btn btn-primary" style="width: auto;" onclick="openModal()">+ Nouvelle recette</button>
+                    </div>
+                    <div id="recipesTable"></div>
+                </div>
+            </div>
+
+            <div id="materielTab" class="tab-content">
+                <div class="content">
+                    <div class="actions">
+                        <button class="btn btn-primary" style="width: auto;" onclick="openMaterielModal()">+ Ajouter du matériel</button>
+                    </div>
+                    <input type="text" id="materielSearch" class="search-box" placeholder="🔍 Rechercher du matériel..." onkeyup="filterMateriel()">
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" onclick="filterByCategory('all')">Tout</button>
+                        <button class="filter-btn" onclick="filterByCategory('utensil')">🥄 Ustensiles</button>
+                        <button class="filter-btn" onclick="filterByCategory('appliance')">⚡ Électroménager</button>
+                        <button class="filter-btn" onclick="filterByCategory('container')">📦 Contenants</button>
+                        <button class="filter-btn" onclick="filterByCategory('cookware')">🍳 Cuisson</button>
+                        <button class="filter-btn" onclick="filterByCategory('measuring')">📏 Mesure</button>
+                        <button class="filter-btn" onclick="filterByCategory('other')">🔧 Autre</button>
+                    </div>
+                    <div id="materielGrid" class="materiel-grid"></div>
+                </div>
+            </div>
+
+            <div id="usersTab" class="tab-content">
+                <div class="content">
+                    <div class="actions">
+                        <button class="btn btn-primary" style="width: auto;" onclick="openCreateUserModal()">+ Nouvel utilisateur</button>
+                    </div>
+                    <div id="usersTable"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recette -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nouvelle Recette</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="recipeForm">
+                <input type="hidden" id="recipeId">
+                <div class="form-group">
+                    <label>Nom de la recette *</label>
+                    <input type="text" id="recipeName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description courte *</label>
+                    <textarea id="recipeDescription" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Tag NFC (ID unique) *</label>
+                    <input type="text" id="recipeNfcTag" required>
+                </div>
+                <div class="form-group">
+                    <label>URL de la vidéo *</label>
+                    <input type="text" id="recipeVideoUrl" required placeholder="http://192.168.1.X:8000/video.mp4">
+                </div>
+                <div class="form-group">
+                    <label>Code icône Flutter *</label>
+                    <input type="number" id="recipeIconCode" required placeholder="ex: 58732">
+                </div>
+                <div class="form-group">
+                    <label>Tags</label>
+                    <div id="tagsList"></div>
+                </div>
+                <div class="form-group">
+                    <label>Ingrédients</label>
+                    <ul id="ingredientsList" class="dynamic-list"></ul>
+                    <button type="button" class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="addIngredient()">+ Ajouter ingrédient</button>
+                </div>
+                <div class="form-group">
+                    <label>Matériel nécessaire</label>
+                    <div id="selectedMaterielList" class="selected-materiel-list"></div>
+                    <button type="button" class="btn btn-info" style="width: auto; padding: 8px 16px; margin-top: 10px;" onclick="openMaterielSelectionModal()">🔪 Ajouter matériel</button>
+                </div>
+                <div class="form-group">
+                    <label>Étapes de préparation</label>
+                    <ul id="stepsList" class="dynamic-list"></ul>
+                    <button type="button" class="btn btn-secondary" style="width: auto; padding: 8px 16px;" onclick="addStep()">+ Ajouter étape</button>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Sélection Matériel -->
+    <div id="materielSelectionModal" class="modal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2>Sélectionner le matériel nécessaire</h2>
+                <span class="close" onclick="closeMaterielSelectionModal()">&times;</span>
+            </div>
+            <input type="text" id="materielSelectionSearch" class="search-box" placeholder="🔍 Rechercher du matériel..." onkeyup="filterMaterielSelection()">
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterMaterielSelectionByCategory('all')">Tout</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('utensil')">🥄 Ustensiles</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('appliance')">⚡ Électroménager</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('container')">📦 Contenants</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('cookware')">🍳 Cuisson</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('measuring')">📏 Mesure</button>
+                <button class="filter-btn" onclick="filterMaterielSelectionByCategory('other')">🔧 Autre</button>
+            </div>
+            <div id="materielSelectionGrid" class="materiel-selection-grid"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-primary" onclick="confirmMaterielSelection()">✓ Valider la sélection</button>
+                <button type="button" class="btn btn-secondary" onclick="closeMaterielSelectionModal()">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Utilisateur -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Nouvel Utilisateur</h2>
+                <span class="close" onclick="closeUserModal()">&times;</span>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>Prénom *</label>
+                    <input type="text" id="userFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label>Nom *</label>
+                    <input type="text" id="userLastName" required>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe <span id="passwordOptional" style="color: #999;">(optionnel en modification)</span></label>
+                    <input type="password" id="userPassword" minlength="8">
+                    <small style="color: #757575;">Min. 8 caractères, dont 1 majuscule, 1 minuscule et 1 chiffre</small>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="userIsActive" style="width: auto; margin: 0;">
+                        Compte actif
+                    </label>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Détail Utilisateur -->
+    <div id="userDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userDetailTitle">Détails de l'utilisateur</h2>
+                <span class="close" onclick="closeUserDetailModal()">&times;</span>
+            </div>
+            <div id="userDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- Modal Matériel (Edition) -->
+    <div id="materielModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="materielModalTitle">Ajouter du matériel</h2>
+                <span class="close" onclick="closeMaterielModal()">&times;</span>
+            </div>
+            <form id="materielForm">
+                <input type="hidden" id="materielId">
+                
+                <div class="form-group">
+                    <label>Nom du matériel *</label>
+                    <input type="text" id="materielName" required placeholder="Ex: Fouet, Mixeur plongeant">
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="materielDescription" rows="3" placeholder="Description détaillée du matériel et de son utilisation"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Catégorie *</label>
+                    <select id="materielCategory" required>
+                        <option value="">-- Sélectionner une catégorie --</option>
+                        <option value="utensil">🥄 Ustensile</option>
+                        <option value="appliance">⚡ Électroménager</option>
+                        <option value="container">📦 Contenant</option>
+                        <option value="cookware">🍳 Cuisson</option>
+                        <option value="measuring">📏 Mesure</option>
+                        <option value="other">🔧 Autre</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>URL de l'image</label>
+                    <input type="url" id="materielImageUrl" placeholder="https://example.com/image.jpg">
+                    <small style="color: #999;">Laisser vide si aucune image disponible</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="materielIsActive" checked style="width: auto; margin: 0;">
+                        <span>Matériel actif (visible dans l'application)</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeMaterielModal()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Matériel Utilisateur -->
+    <div id="userMaterielModal" class="modal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2 id="userMaterielModalTitle">Matériel de l'utilisateur</h2>
+                <span class="close" onclick="closeUserMaterielModal()">&times;</span>
+            </div>
+            <div id="userMaterielContent">
+                <div id="userMaterielGrid" class="materiel-grid"></div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-success" onclick="openAddUserMaterielModal()">➕ Ajouter du matériel</button>
+                <button type="button" class="btn btn-secondary" onclick="closeUserMaterielModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ajouter Matériel Utilisateur -->
+    <div id="addUserMaterielModal" class="modal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2>Ajouter du matériel à l'utilisateur</h2>
+                <span class="close" onclick="closeAddUserMaterielModal()">&times;</span>
+            </div>
+            <input type="text" id="addUserMaterielSearch" class="search-box" placeholder="🔍 Rechercher du matériel..." onkeyup="filterAddUserMateriel()">
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterAddUserMaterielByCategory('all')">Tout</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('utensil')">🥄 Ustensiles</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('appliance')">⚡ Électroménager</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('container')">📦 Contenants</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('cookware')">🍳 Cuisson</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('measuring')">📏 Mesure</button>
+                <button class="filter-btn" onclick="filterAddUserMaterielByCategory('other')">🔧 Autre</button>
+            </div>
+            <div id="addUserMaterielGrid" class="materiel-selection-grid"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddUserMaterielModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://192.168.1.155:8080';
+        let token = localStorage.getItem('adminToken');
+        let allTags = [];
+        let allRecipes = [];
+        let allMateriel = [];
+        let currentFilter = 'all';
+        let currentUserIdForRecipes = null;
+        let selectedMaterielIds = []; // Pour stocker les IDs du matériel sélectionné
+        let currentMaterielFilter = 'all'; // Pour le filtre dans le modal de sélection
+
+        if (token) {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('adminPage').style.display = 'block';
+            init();
+        }
+
+        // ============================================
+        // AUTHENTIFICATION
+        // ============================================
+        
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.access_token;
+                    localStorage.setItem('adminToken', token);
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('adminPage').style.display = 'block';
+                    init();
+                } else {
+                    const error = await response.json();
+                    document.getElementById('loginError').textContent = error.detail || 'Erreur de connexion';
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'Impossible de se connecter au serveur';
+                document.getElementById('loginError').style.display = 'block';
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            location.reload();
+        }
+
+        // ============================================
+        // INITIALISATION
+        // ============================================
+        
+        async function init() {
+            await loadStats();
+            await loadRecipes();
+            await loadMateriel();
+            await loadUsers();
+            await loadTags();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        async function loadStats() {
+            try {
+                const [recipesRes, usersRes, tagsRes, materielRes] = await Promise.all([
+                    fetch(`${API_URL}/recipes`),
+                    fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/tags`),
+                    fetch(`${API_URL}/admin/materiel`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+                const recipes = await recipesRes.json();
+                const users = await usersRes.json();
+                const tags = await tagsRes.json();
+                const materiel = await materielRes.json();
+                
+                document.getElementById('totalRecipes').textContent = recipes.length;
+                document.getElementById('totalUsers').textContent = users.length;
+                document.getElementById('totalTags').textContent = tags.length;
+                document.getElementById('totalMateriel').textContent = materiel.length;
+            } catch (error) {
+                console.error('Erreur chargement stats:', error);
+            }
+        }
+
+        // ============================================
+        // GESTION DES RECETTES
+        // ============================================
+        
+        async function loadRecipes() {
+            const table = document.getElementById('recipesTable');
+            try {
+                const response = await fetch(`${API_URL}/recipes`);
+                allRecipes = await response.json();
+                let html = '<table><thead><tr><th>Nom</th><th>Tag NFC</th><th>Tags</th><th>Actions</th></tr></thead><tbody>';
+                allRecipes.forEach(recipe => {
+                    const tags = recipe.tags.map(t => `<span class="badge badge-info">${t.name}</span>`).join(' ');
+                    html += `<tr>
+                        <td><strong>${recipe.name}</strong><br><small style="color: #999;">${recipe.short_description}</small></td>
+                        <td><code>${recipe.nfc_tag}</code></td>
+                        <td>${tags || '<span style="color: #999;">Aucun</span>'}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-secondary" onclick="editRecipe(${recipe.id})">✏️ Modifier</button>
+                                <button class="btn-small btn-danger" onclick="deleteRecipe(${recipe.id}, '${recipe.name.replace(/'/g, "\\'")}')">🗑️ Supprimer</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                table.innerHTML = html;
+            } catch (error) {
+                table.innerHTML = '<p style="text-align: center; color: #f44336;">Erreur de chargement</p>';
+            }
+        }
+
+        async function loadTags() {
+            try {
+                const response = await fetch(`${API_URL}/tags`);
+                allTags = await response.json();
+            } catch (error) {
+                console.error('Erreur chargement tags:', error);
+            }
+        }
+
+        function loadTagsCheckboxes(selectedTags = []) {
+            const container = document.getElementById('tagsList');
+            let html = '';
+            allTags.forEach(tag => {
+                const checked = selectedTags.includes(tag.id) ? 'checked' : '';
+                html += `<label class="tag-checkbox">
+                    <input type="checkbox" value="${tag.id}" ${checked}> ${tag.name}
+                </label>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function openModal() {
+            document.getElementById('recipeForm').reset();
+            document.getElementById('recipeId').value = '';
+            document.getElementById('modalTitle').textContent = 'Nouvelle Recette';
+            document.getElementById('ingredientsList').innerHTML = '';
+            document.getElementById('stepsList').innerHTML = '';
+            selectedMaterielIds = [];
+            updateSelectedMaterielDisplay();
+            loadTagsCheckboxes();
+            document.getElementById('recipeModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('recipeModal').style.display = 'none';
+        }
+
+        function addIngredient(value = '') {
+            const list = document.getElementById('ingredientsList');
+            const li = document.createElement('li');
+            li.innerHTML = `<input type="text" class="ingredient-input" value="${value}" placeholder="Quantité et ingrédient">
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>`;
+            list.appendChild(li);
+        }
+
+        function addStep(value = '') {
+            const list = document.getElementById('stepsList');
+            const li = document.createElement('li');
+            li.innerHTML = `<textarea class="step-input" rows="2" placeholder="Description de l'étape">${value}</textarea>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>`;
+            list.appendChild(li);
+        }
+
+        async function editRecipe(id) {
+            try {
+                const response = await fetch(`${API_URL}/recipes/${id}`);
+                const recipe = await response.json();
+                
+                document.getElementById('modalTitle').textContent = 'Modifier la Recette';
+                document.getElementById('recipeId').value = recipe.id;
+                document.getElementById('recipeName').value = recipe.name;
+                document.getElementById('recipeDescription').value = recipe.short_description;
+                document.getElementById('recipeNfcTag').value = recipe.nfc_tag;
+                document.getElementById('recipeVideoUrl').value = recipe.video_url;
+                document.getElementById('recipeIconCode').value = recipe.icon_code_point;
+                
+                document.getElementById('ingredientsList').innerHTML = '';
+                recipe.ingredients.forEach(ing => addIngredient(ing.name));
+                
+                document.getElementById('stepsList').innerHTML = '';
+                recipe.steps.forEach(step => addStep(step.description));
+                
+                const selectedTags = recipe.tags.map(t => t.id);
+                loadTagsCheckboxes(selectedTags);
+                
+                // Charger le matériel associé
+                selectedMaterielIds = recipe.materiel ? recipe.materiel.map(m => m.id) : [];
+                updateSelectedMaterielDisplay();
+                
+                document.getElementById('recipeModal').style.display = 'flex';
+            } catch (error) {
+                alert('Erreur lors du chargement de la recette');
+            }
+        }
+
+        async function deleteRecipe(id, name) {
+            if (!confirm(`Voulez-vous vraiment supprimer la recette "${name}" ?\n\nCette action est irréversible.`)) return;
+            try {
+                const response = await fetch(`${API_URL}/recipes/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    alert('Recette supprimée avec succès');
+                    loadRecipes();
+                    loadStats();
+                } else {
+                    alert('Erreur lors de la suppression');
+                }
+            } catch (error) {
+                alert('Erreur de connexion au serveur');
+            }
+        }
+
+        document.getElementById('recipeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const recipeId = document.getElementById('recipeId').value;
+            const ingredients = Array.from(document.querySelectorAll('.ingredient-input')).map(input => input.value.trim()).filter(val => val !== '');
+            const steps = Array.from(document.querySelectorAll('.step-input')).map(input => input.value.trim()).filter(val => val !== '');
+            const tagIds = Array.from(document.querySelectorAll('#tagsList input:checked')).map(input => parseInt(input.value));
+            
+            const recipeData = {
+                name: document.getElementById('recipeName').value,
+                short_description: document.getElementById('recipeDescription').value,
+                nfc_tag: document.getElementById('recipeNfcTag').value,
+                video_url: document.getElementById('recipeVideoUrl').value,
+                icon_code_point: parseInt(document.getElementById('recipeIconCode').value),
+                ingredients, 
+                steps, 
+                tag_ids: tagIds,
+                materiel_ids: selectedMaterielIds // Ajouter les IDs du matériel
+            };
+            
+            try {
+                const url = recipeId ? `${API_URL}/recipes/${recipeId}` : `${API_URL}/recipes`;
+                const method = recipeId ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method, 
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify(recipeData)
+                });
+                
+                if (response.ok) {
+                    alert(recipeId ? 'Recette modifiée avec succès' : 'Recette créée avec succès');
+                    closeModal();
+                    loadRecipes();
+                    loadStats();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('Erreur de connexion au serveur');
+            }
+        });
+
+        // ============================================
+        // GESTION DE LA SÉLECTION DE MATÉRIEL
+        // ============================================
+
+        function openMaterielSelectionModal() {
+            currentMaterielFilter = 'all';
+            displayMaterielSelection();
+            document.getElementById('materielSelectionModal').style.display = 'flex';
+        }
+
+        function closeMaterielSelectionModal() {
+            document.getElementById('materielSelectionModal').style.display = 'none';
+        }
+
+        function displayMaterielSelection() {
+            const grid = document.getElementById('materielSelectionGrid');
+            let filtered = allMateriel.filter(m => m.is_active);
+            
+            // Appliquer le filtre de catégorie
+            if (currentMaterielFilter !== 'all') {
+                filtered = filtered.filter(m => m.category === currentMaterielFilter);
+            }
+            
+            // Appliquer le filtre de recherche
+            const searchTerm = document.getElementById('materielSelectionSearch').value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(m => 
+                    m.name.toLowerCase().includes(searchTerm) || 
+                    (m.description && m.description.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            let html = '';
+            filtered.forEach(materiel => {
+                const categoryIcons = {
+                    'utensil': '🥄',
+                    'appliance': '⚡',
+                    'container': '📦',
+                    'cookware': '🍳',
+                    'measuring': '📏',
+                    'other': '🔧'
+                };
+                
+                const categoryNames = {
+                    'utensil': 'Ustensile',
+                    'appliance': 'Électroménager',
+                    'container': 'Contenant',
+                    'cookware': 'Cuisson',
+                    'measuring': 'Mesure',
+                    'other': 'Autre'
+                };
+                
+                const badgeClass = `badge-${materiel.category}`;
+                const icon = categoryIcons[materiel.category] || '🔧';
+                const categoryName = categoryNames[materiel.category] || 'Autre';
+                const isSelected = selectedMaterielIds.includes(materiel.id);
+                const selectedClass = isSelected ? 'selected' : '';
+                
+                const imageUrl = materiel.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="120"%3E%3Crect fill="%23f5f5f5" width="200" height="120"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="40"%3E' + icon + '%3C/text%3E%3C/svg%3E';
+                
+                html += `
+                    <div class="materiel-tile ${selectedClass}" onclick="toggleMaterielSelection(${materiel.id})">
+                        <img src="${imageUrl}" alt="${materiel.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'120\\'%3E%3Crect fill=\\'%23f5f5f5\\' width=\\'200\\' height=\\'120\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\' fill=\\'%23999\\' font-size=\\'40\\'%3E${icon}%3C/text%3E%3C/svg%3E'">
+                        <h5>${materiel.name}</h5>
+                        <span class="badge ${badgeClass} category-badge">${icon} ${categoryName}</span>
+                    </div>
+                `;
+            });
+            
+            if (html === '') {
+                html = '<p style="text-align: center; color: #999; grid-column: 1 / -1; padding: 40px;">Aucun matériel trouvé</p>';
+            }
+            
+            grid.innerHTML = html;
+        }
+
+        function toggleMaterielSelection(materielId) {
+            const index = selectedMaterielIds.indexOf(materielId);
+            if (index > -1) {
+                selectedMaterielIds.splice(index, 1);
+            } else {
+                selectedMaterielIds.push(materielId);
+            }
+            displayMaterielSelection();
+        }
+
+        function confirmMaterielSelection() {
+            updateSelectedMaterielDisplay();
+            closeMaterielSelectionModal();
+        }
+
+        function updateSelectedMaterielDisplay() {
+            const container = document.getElementById('selectedMaterielList');
+            if (selectedMaterielIds.length === 0) {
+                container.innerHTML = '<p style="color: #999; margin: 0;">Aucun matériel sélectionné</p>';
+                return;
+            }
+            
+            let html = '';
+            selectedMaterielIds.forEach(id => {
+                const materiel = allMateriel.find(m => m.id === id);
+                if (materiel) {
+                    html += `
+                        <div class="selected-materiel-item">
+                            <span>${materiel.name}</span>
+                            <button type="button" onclick="removeMaterielFromSelection(${id})">×</button>
+                        </div>
+                    `;
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        function removeMaterielFromSelection(materielId) {
+            const index = selectedMaterielIds.indexOf(materielId);
+            if (index > -1) {
+                selectedMaterielIds.splice(index, 1);
+                updateSelectedMaterielDisplay();
+            }
+        }
+
+        function filterMaterielSelection() {
+            displayMaterielSelection();
+        }
+
+        function filterMaterielSelectionByCategory(category) {
+            currentMaterielFilter = category;
+            document.querySelectorAll('#materielSelectionModal .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            displayMaterielSelection();
+        }
+
+        // ============================================
+        // GESTION DES UTILISATEURS
+        // ============================================
+        
+        async function loadUsers() {
+            const table = document.getElementById('usersTable');
+            try {
+                const response = await fetch(`${API_URL}/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const users = await response.json();
+                let html = '<table><thead><tr><th>Email</th><th>Nom</th><th>Prénom</th><th>Statut</th><th>Recettes débloquées</th><th>Inscrit le</th><th>Actions</th></tr></thead><tbody>';
+                users.forEach(user => {
+                    const statusClass = user.is_active ? 'badge-success' : 'badge-danger';
+                    const statusText = user.is_active ? 'Actif' : 'Inactif';
+                    const date = new Date(user.created_at).toLocaleDateString('fr-FR');
+                    html += `<tr>
+                        <td>${user.email}</td>
+                        <td>${user.last_name}</td>
+                        <td>${user.first_name}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td><span class="badge badge-info">${user.unlocked_count} / ${allRecipes.length}</span></td>
+                        <td>${date}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small btn-primary" onclick="viewUserDetail(${user.id})">👁️ Détails</button>
+                                <button class="btn-small btn-secondary" onclick="editUser(${user.id})">✏️ Modifier</button>
+                                <button class="btn-small btn-warning" onclick="manageUserRecipes(${user.id})">📋 Recettes</button>
+                                <button class="btn-small btn-info" onclick="openUserMaterielModal(${user.id})">🔪 Matériel</button>
+                                <button class="btn-small btn-danger" onclick="deleteUser(${user.id}, '${user.email.replace(/'/g, "\\'")}')">🗑️ Supprimer</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                table.innerHTML = html;
+            } catch (error) {
+                table.innerHTML = '<p style="text-align: center; color: #f44336;">Erreur de chargement</p>';
+            }
+        }
+
+        function openCreateUserModal() {
+            document.getElementById('userModalTitle').textContent = 'Nouvel Utilisateur';
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            document.getElementById('userIsActive').checked = true;
+            document.getElementById('passwordOptional').style.display = 'none';
+            document.getElementById('userPassword').required = true;
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        async function editUser(id) {
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const user = await response.json();
+                document.getElementById('userModalTitle').textContent = 'Modifier l\'utilisateur';
+                document.getElementById('userId').value = user.id;
+                document.getElementById('userEmail').value = user.email;
+                document.getElementById('userFirstName').value = user.first_name;
+                document.getElementById('userLastName').value = user.last_name;
+                document.getElementById('userPassword').value = '';
+                document.getElementById('userIsActive').checked = user.is_active;
+                document.getElementById('passwordOptional').style.display = 'inline';
+                document.getElementById('userPassword').required = false;
+                document.getElementById('userModal').style.display = 'flex';
+            } catch (error) {
+                alert('Erreur lors du chargement de l\'utilisateur');
+            }
+        }
+
+        async function deleteUser(id, email) {
+            if (!confirm(`Voulez-vous vraiment supprimer l'utilisateur "${email}" ?\n\nToutes ses recettes débloquées seront également supprimées.\nCette action est irréversible.`)) return;
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                if (response.ok) {
+                    alert('Utilisateur supprimé avec succès');
+                    loadUsers();
+                    loadStats();
+                }
+            } catch (error) {
+                alert('Erreur de connexion au serveur');
+            }
+        }
+
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('userId').value;
+            const userData = {
+                email: document.getElementById('userEmail').value,
+                first_name: document.getElementById('userFirstName').value,
+                last_name: document.getElementById('userLastName').value,
+                is_active: document.getElementById('userIsActive').checked
+            };
+            const password = document.getElementById('userPassword').value;
+            if (password) userData.password = password;
+            try {
+                const url = userId ? `${API_URL}/admin/users/${userId}` : `${API_URL}/app/register`;
+                const method = userId ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method, headers: { 'Content-Type': 'application/json', 'Authorization': userId ? `Bearer ${token}` : undefined },
+                    body: JSON.stringify(userData)
+                });
+                if (response.ok) {
+                    alert(userId ? 'Utilisateur modifié avec succès' : 'Utilisateur créé avec succès');
+                    closeUserModal();
+                    loadUsers();
+                    loadStats();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Erreur inconnue'));
+                }
+            } catch (error) {
+                alert('Erreur de connexion au serveur');
+            }
+        });
+
+        async function viewUserDetail(id) {
+            try {
+                const response = await fetch(`${API_URL}/admin/users/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const user = await response.json();
+                const date = new Date(user.created_at).toLocaleDateString('fr-FR');
+                const statusClass = user.is_active ? 'badge-success' : 'badge-danger';
+                const statusText = user.is_active ? 'Actif' : 'Inactif';
+                let html = `<div class="user-detail">
+                    <h4>Informations générales</h4>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Nom:</strong> ${user.last_name}</p>
+                    <p><strong>Prénom:</strong> ${user.first_name}</p>
+                    <p><strong>Statut:</strong> <span class="badge ${statusClass}">${statusText}</span></p>
+                    <p><strong>Inscrit le:</strong> ${date}</p>
+                </div><div class="user-detail">
+                    <h4>Recettes débloquées (${user.unlocked_recipes.length} / ${allRecipes.length})</h4>`;
+                if (user.unlocked_recipes.length > 0) {
+                    html += '<div class="recipes-grid">';
+                    user.unlocked_recipes.forEach(recipe => {
+                        html += `<div class="recipe-card unlocked">
+                            <span>${recipe.name}</span>
+                            <span class="badge badge-success">✓</span>
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<p style="color: #999;">Aucune recette débloquée</p>';
+                }
+                html += '</div>';
+                document.getElementById('userDetailContent').innerHTML = html;
+                document.getElementById('userDetailTitle').textContent = `Détails de ${user.first_name} ${user.last_name}`;
+                document.getElementById('userDetailModal').style.display = 'flex';
+            } catch (error) {
+                alert('Erreur lors du chargement des détails');
+            }
+        }
+
+        function closeUserDetailModal() {
+            document.getElementById('userDetailModal').style.display = 'none';
+        }
+
+        async function manageUserRecipes(userId) {
+            currentUserIdForRecipes = userId;
+            try {
+                const [userResponse, recipesResponse] = await Promise.all([
+                    fetch(`${API_URL}/admin/users/${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/recipes`)
+                ]);
+                const user = await userResponse.json();
+                const allRecipes = await recipesResponse.json();
+                const unlockedIds = user.unlocked_recipes.map(r => r.id);
+                let html = `<div class="user-detail">
+                    <h4>Gérer les recettes de ${user.first_name} ${user.last_name}</h4>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p style="color: #666; margin-top: 10px;">Cochez les recettes auxquelles cet utilisateur doit avoir accès.</p>
+                </div><div class="form-group">
+                    <label>Recettes disponibles :</label>
+                    <div class="checkbox-grid">`;
+                allRecipes.forEach(recipe => {
+                    const isChecked = unlockedIds.includes(recipe.id);
+                    html += `<div class="checkbox-item">
+                        <input type="checkbox" id="recipe_${recipe.id}" value="${recipe.id}" ${isChecked ? 'checked' : ''}>
+                        <label for="recipe_${recipe.id}">${recipe.name}</label>
+                    </div>`;
+                });
+                html += `</div></div><div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="saveUserRecipes()">💾 Enregistrer</button>
+                    <button class="btn btn-secondary" onclick="closeUserDetailModal()">Annuler</button>
+                </div>`;
+                document.getElementById('userDetailTitle').textContent = 'Gestion des recettes';
+                document.getElementById('userDetailContent').innerHTML = html;
+                document.getElementById('userDetailModal').style.display = 'flex';
+            } catch (error) {
+                alert('Erreur lors du chargement');
+            }
+        }
+
+        async function saveUserRecipes() {
+            const selectedRecipeIds = Array.from(document.querySelectorAll('.checkbox-grid input:checked')).map(input => parseInt(input.value));
+            try {
+            const userResponse = await fetch(`${API_URL}/admin/users/${currentUserIdForRecipes}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const user = await userResponse.json();
+            const currentUnlockedIds = user.unlocked_recipes.map(r => r.id);
+            const toUnlock = selectedRecipeIds.filter(id => !currentUnlockedIds.includes(id));
+            const toLock = currentUnlockedIds.filter(id => !selectedRecipeIds.includes(id));
+                if (toUnlock.length > 0) {
+                    await fetch(`${API_URL}/admin/users/${currentUserIdForRecipes}/unlock-recipes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ recipe_ids: toUnlock })
+                    });
+                }
+                for (const recipeId of toLock) {
+                    await fetch(`${API_URL}/admin/users/${currentUserIdForRecipes}/recipes/${recipeId}`, {
+                        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+                alert('Recettes mises à jour avec succès');
+                closeUserDetailModal();
+                loadUsers();
+                loadStats();
+            } catch (error) {
+                alert('Erreur lors de la mise à jour des recettes');
+            }
+        }
+
+
+        // ============================================
+        // GESTION DU MATÉRIEL
+        // ============================================
+        
+        async function loadMateriel() {
+            try {
+                const response = await fetch(`${API_URL}/admin/materiel`, { headers: { 'Authorization': `Bearer ${token}` } });
+                allMateriel = await response.json();
+                displayMateriel(allMateriel);
+            } catch (error) {
+                console.error('Erreur chargement matériel:', error);
+                document.getElementById('materielGrid').innerHTML = '<p style="text-align: center; color: #f44336;">Erreur de chargement</p>';
+            }
+        }
+
+        function displayMateriel(materielList) {
+            const grid = document.getElementById('materielGrid');
+            
+            if (materielList.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: #999; grid-column: 1 / -1; padding: 40px;">Aucun matériel trouvé</p>';
+                return;
+            }
+            
+            let html = '';
+            materielList.forEach(materiel => {
+                const categoryIcons = {
+                    'utensil': '🥄',
+                    'appliance': '⚡',
+                    'container': '📦',
+                    'cookware': '🍳',
+                    'measuring': '📏',
+                    'other': '🔧'
+                };
+                
+                const categoryNames = {
+                    'utensil': 'Ustensile',
+                    'appliance': 'Électroménager',
+                    'container': 'Contenant',
+                    'cookware': 'Cuisson',
+                    'measuring': 'Mesure',
+                    'other': 'Autre'
+                };
+                
+                const badgeClass = `badge-${materiel.category}`;
+                const statusClass = materiel.is_active ? 'badge-success' : 'badge-danger';
+                const statusText = materiel.is_active ? 'Actif' : 'Inactif';
+                const icon = categoryIcons[materiel.category] || '🔧';
+                const categoryName = categoryNames[materiel.category] || 'Autre';
+                
+                const imageUrl = materiel.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="250" height="150"%3E%3Crect fill="%23f5f5f5" width="250" height="150"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="50"%3E' + icon + '%3C/text%3E%3C/svg%3E';
+                
+                html += `
+                    <div class="materiel-card">
+                        <img src="${imageUrl}" alt="${materiel.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'250\\' height=\\'150\\'%3E%3Crect fill=\\'%23f5f5f5\\' width=\\'250\\' height=\\'150\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\' fill=\\'%23999\\' font-size=\\'50\\'%3E${icon}%3C/text%3E%3C/svg%3E'">
+                        <h4>${materiel.name}</h4>
+                        <p>${materiel.description || 'Aucune description'}</p>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+                            <span class="badge ${badgeClass}">${icon} ${categoryName}</span>
+                            <span class="badge ${statusClass}">${statusText}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px; margin-top: 10px;">
+                            <button class="btn-small btn-secondary" style="flex: 1;" onclick="editMateriel(${materiel.id})">✏️ Modifier</button>
+                            <button class="btn-small btn-danger" style="flex: 1;" onclick="deleteMateriel(${materiel.id}, '${materiel.name.replace(/'/g, "\\'")}')">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        function filterByCategory(category) {
+            currentFilter = category;
+            document.querySelectorAll('#materielTab .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            filterMateriel();
+        }
+
+        function filterMateriel() {
+            let filtered = [...allMateriel];
+            
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(m => m.category === currentFilter);
+            }
+            
+            const searchTerm = document.getElementById('materielSearch').value.toLowerCase();
+            
+            if (searchTerm) {
+                filtered = filtered.filter(m => 
+                    m.name.toLowerCase().includes(searchTerm) || 
+                    (m.description && m.description.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            displayMateriel(filtered);
+        }
+
+        function openMaterielModal(id = null) {
+            document.getElementById('materielForm').reset();
+            document.getElementById('materielId').value = '';
+            document.getElementById('materielModalTitle').textContent = 'Ajouter du matériel';
+            document.getElementById('materielIsActive').checked = true;
+            document.getElementById('materielModal').style.display = 'flex';
+        }
+
+        function closeMaterielModal() {
+            document.getElementById('materielModal').style.display = 'none';
+        }
+
+        async function editMateriel(id) {
+            try {
+                const materiel = allMateriel.find(m => m.id === id);
+                if (!materiel) {
+                    throw new Error('Matériel non trouvé');
+                }
+                
+                document.getElementById('materielId').value = materiel.id;
+                document.getElementById('materielName').value = materiel.name;
+                document.getElementById('materielDescription').value = materiel.description || '';
+                document.getElementById('materielCategory').value = materiel.category;
+                document.getElementById('materielImageUrl').value = materiel.image_url || '';
+                document.getElementById('materielIsActive').checked = materiel.is_active;
+                
+                document.getElementById('materielModalTitle').textContent = 'Modifier le matériel';
+                document.getElementById('materielModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors du chargement du matériel');
+            }
+        }
+
+        document.getElementById('materielForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('materielId').value;
+            const data = {
+                name: document.getElementById('materielName').value,
+                description: document.getElementById('materielDescription').value || null,
+                category: document.getElementById('materielCategory').value,
+                image_url: document.getElementById('materielImageUrl').value || null,
+                is_active: document.getElementById('materielIsActive').checked
+            };
+            
+            try {
+                const url = id ? `${API_URL}/admin/materiel/${id}` : `${API_URL}/admin/materiel`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert(id ? 'Matériel modifié avec succès' : 'Matériel ajouté avec succès');
+                    closeMaterielModal();
+                    await loadMateriel();
+                    await loadStats();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Une erreur est survenue'));
+                }
+            } catch (error) {
+                alert('Erreur lors de l\'enregistrement du matériel: ' + error.message);
+            }
+        });
+
+        async function deleteMateriel(id, name) {
+            if (!confirm(`Voulez-vous vraiment supprimer "${name}" ?\n\n⚠️ Attention: Cette action est irréversible !`)) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/materiel/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    alert('Matériel supprimé avec succès');
+                    await loadMateriel();
+                    await loadStats();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Impossible de supprimer ce matériel (peut-être utilisé dans des recettes)'));
+                }
+            } catch (error) {
+                alert('Erreur lors de la suppression du matériel');
+            }
+        }
+
+        // ============================================
+        // GESTION DU MATÉRIEL UTILISATEUR
+        // ============================================
+        
+        let currentUserIdForMateriel = null;
+        let currentUserMateriel = [];
+        let currentAddUserMaterielFilter = 'all';
+
+        async function openUserMaterielModal(userId) {
+            currentUserIdForMateriel = userId;
+            
+            // Récupérer les infos de l'utilisateur
+            try {
+                const userResponse = await fetch(`${API_URL}/admin/users/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const userData = await userResponse.json();
+                
+                document.getElementById('userMaterielModalTitle').textContent = 
+                    `Matériel de ${userData.first_name} ${userData.last_name}`;
+                
+                document.getElementById('userMaterielModal').style.display = 'flex';
+                await loadUserMateriel(userId);
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors du chargement des informations');
+            }
+        }
+
+        function closeUserMaterielModal() {
+            document.getElementById('userMaterielModal').style.display = 'none';
+            currentUserIdForMateriel = null;
+            currentUserMateriel = [];
+        }
+
+        async function loadUserMateriel(userId) {
+            try {
+                const response = await fetch(`${API_URL}/users/${userId}/materiel`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    currentUserMateriel = await response.json();
+                    displayUserMateriel();
+                } else {
+                    throw new Error('Erreur lors du chargement');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                document.getElementById('userMaterielGrid').innerHTML = 
+                    '<p style="text-align: center; color: #f44336;">Erreur de chargement</p>';
+            }
+        }
+
+        function displayUserMateriel() {
+            const grid = document.getElementById('userMaterielGrid');
+            
+            if (currentUserMateriel.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">Aucun matériel pour cet utilisateur</p>';
+                return;
+            }
+            
+            let html = '';
+            currentUserMateriel.forEach(item => {
+                const categoryIcons = {
+                    'utensil': '🥄',
+                    'appliance': '⚡',
+                    'container': '📦',
+                    'cookware': '🍳',
+                    'measuring': '📏',
+                    'other': '🔧'
+                };
+                const categoryNames = {
+                    'utensil': 'Ustensile',
+                    'appliance': 'Électroménager',
+                    'container': 'Contenant',
+                    'cookware': 'Cuisson',
+                    'measuring': 'Mesure',
+                    'other': 'Autre'
+                };
+                
+                const icon = categoryIcons[item.category] || '🔧';
+                const categoryName = categoryNames[item.category] || item.category;
+                const badgeClass = `badge-${item.category}`;
+                const imageUrl = item.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="150"%3E%3Crect fill="%23f5f5f5" width="200" height="150"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="40" fill="%23ccc"%3E' + icon + '%3C/text%3E%3C/svg%3E';
+                
+                html += `
+                    <div class="materiel-card">
+                        <img src="${imageUrl}" alt="${item.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'150\\'%3E%3Crect fill=\\'%23f5f5f5\\' width=\\'200\\' height=\\'150\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-family=\\'Arial\\' font-size=\\'40\\' fill=\\'%23ccc\\'%3E${icon}%3C/text%3E%3C/svg%3E'">
+                        <h4>${item.name}</h4>
+                        <p>${item.description || 'Pas de description'}</p>
+                        <span class="badge ${badgeClass}">${icon} ${categoryName}</span>
+                        ${item.note ? `<p style="font-size: 12px; color: #999; margin-top: 5px;">Note: ${item.note}</p>` : ''}
+                        <div style="margin-top: 10px;">
+                            <button class="btn-small btn-danger" style="width: 100%;" onclick="deleteUserMateriel(${currentUserIdForMateriel}, ${item.id}, '${item.name.replace(/'/g, "\\'")}')">🗑️ Supprimer</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        async function openAddUserMaterielModal() {
+            if (!currentUserIdForMateriel) {
+                alert('Erreur: aucun utilisateur sélectionné');
+                return;
+            }
+            
+            document.getElementById('addUserMaterielModal').style.display = 'flex';
+            currentAddUserMaterielFilter = 'all';
+            
+            // Réinitialiser les filtres
+            document.querySelectorAll('#addUserMaterielModal .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector('#addUserMaterielModal .filter-btn').classList.add('active');
+            
+            displayAddUserMateriel();
+        }
+
+        function closeAddUserMaterielModal() {
+            document.getElementById('addUserMaterielModal').style.display = 'none';
+            document.getElementById('addUserMaterielSearch').value = '';
+        }
+
+        function displayAddUserMateriel() {
+            const grid = document.getElementById('addUserMaterielGrid');
+            const searchTerm = document.getElementById('addUserMaterielSearch').value.toLowerCase();
+            
+            // Filtrer les matériels déjà possédés
+            const userMaterielIds = currentUserMateriel.map(m => m.materiel_id);
+            let availableMateriel = allMateriel.filter(m => 
+                !userMaterielIds.includes(m.id) && m.is_active
+            );
+            
+            // Appliquer les filtres
+            if (currentAddUserMaterielFilter !== 'all') {
+                availableMateriel = availableMateriel.filter(m => m.category === currentAddUserMaterielFilter);
+            }
+            
+            if (searchTerm) {
+                availableMateriel = availableMateriel.filter(m => 
+                    m.name.toLowerCase().includes(searchTerm) ||
+                    (m.description && m.description.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            if (availableMateriel.length === 0) {
+                grid.innerHTML = '<p style="text-align: center; color: #999; grid-column: 1 / -1; padding: 40px;">Aucun matériel disponible</p>';
+                return;
+            }
+            
+            let html = '';
+            availableMateriel.forEach(materiel => {
+                const categoryIcons = {
+                    'utensil': '🥄',
+                    'appliance': '⚡',
+                    'container': '📦',
+                    'cookware': '🍳',
+                    'measuring': '📏',
+                    'other': '🔧'
+                };
+                
+                const icon = categoryIcons[materiel.category] || '🔧';
+                const imageUrl = materiel.image_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="120"%3E%3Crect fill="%23f5f5f5" width="200" height="120"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="40" fill="%23ccc"%3E' + icon + '%3C/text%3E%3C/svg%3E';
+                
+                html += `
+                    <div class="materiel-tile" onclick="addMaterielToUser(${materiel.id})">
+                        <img src="${imageUrl}" alt="${materiel.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'120\\'%3E%3Crect fill=\\'%23f5f5f5\\' width=\\'200\\' height=\\'120\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\' font-family=\\'Arial\\' font-size=\\'40\\' fill=\\'%23ccc\\'%3E${icon}%3C/text%3E%3C/svg%3E'">
+                        <h5>${materiel.name}</h5>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        async function addMaterielToUser(materielId) {
+            if (!currentUserIdForMateriel) {
+                alert('Erreur: aucun utilisateur sélectionné');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/users/${currentUserIdForMateriel}/materiel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        materiel_id: materielId,
+                        quantity: 1,
+                        note: null
+                    })
+                });
+                
+                if (response.ok) {
+                    await loadUserMateriel(currentUserIdForMateriel);
+                    displayAddUserMateriel(); // Rafraîchir la liste des matériels disponibles
+                    alert('Matériel ajouté avec succès');
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Impossible d\'ajouter ce matériel'));
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors de l\'ajout du matériel');
+            }
+        }
+
+        async function deleteUserMateriel(userId, materielId, materielName) {
+            if (!confirm(`Voulez-vous vraiment retirer "${materielName}" de cet utilisateur ?`)) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/users/${userId}/materiel/${materielId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    await loadUserMateriel(userId);
+                    alert('Matériel retiré avec succès');
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + (error.detail || 'Impossible de retirer ce matériel'));
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert('Erreur lors de la suppression');
+            }
+        }
+
+        function filterAddUserMateriel() {
+            displayAddUserMateriel();
+        }
+
+        function filterAddUserMaterielByCategory(category) {
+            currentAddUserMaterielFilter = category;
+            document.querySelectorAll('#addUserMaterielModal .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            displayAddUserMateriel();
+        }
+
+        // ============================================
+        // GESTION DES MODALES
+        // ============================================
+        
+        window.onclick = function(event) {
+            const recipeModal = document.getElementById('recipeModal');
+            const userModal = document.getElementById('userModal');
+            const userDetailModal = document.getElementById('userDetailModal');
+            const materielModal = document.getElementById('materielModal');
+            const materielSelectionModal = document.getElementById('materielSelectionModal');
+            const userMaterielModal = document.getElementById('userMaterielModal');
+            const addUserMaterielModal = document.getElementById('addUserMaterielModal');
+            
+            if (event.target === recipeModal) closeModal();
+            else if (event.target === userModal) closeUserModal();
+            else if (event.target === userDetailModal) closeUserDetailModal();
+            else if (event.target === materielModal) closeMaterielModal();
+            else if (event.target === materielSelectionModal) closeMaterielSelectionModal();
+            else if (event.target === userMaterielModal) closeUserMaterielModal();
+            else if (event.target === addUserMaterielModal) closeAddUserMaterielModal();
+        }
+    </script>
+</body>
+</html>
