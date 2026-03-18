@@ -223,9 +223,6 @@ def healthcheck():
     finally:
         conn.close()
 
-@app.get("/gen-hash/{password}")
-def gen_hash(password: str):
-    return {"hash": get_password_hash(password)}
 
 # ========== ROUTES D'AUTHENTIFICATION ==========
 
