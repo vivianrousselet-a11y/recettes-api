@@ -2,7 +2,8 @@ fastapi
 uvicorn[standard]
 psycopg2-binary
 python-jose[cryptography]
-passlib[bcrypt]
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-dotenv
 pydantic
 httpx
