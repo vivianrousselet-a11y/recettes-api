@@ -391,81 +391,89 @@ def get_recipes(user_id: Optional[int] = None):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Récupérer les recettes avec le statut de déverrouillage
+
+        # ✅ 1 seule requête pour les recettes + count ingrédients + count étapes
         if user_id is not None:
             cur.execute("""
                 SELECT 
-                    r.id, 
-                    r.name, 
-                    r.short_description, 
-                    r.nfc_tag, 
-                    r.video_url, 
-                    r.icon_code_point,
-                    CASE WHEN ur.user_id IS NOT NULL THEN true ELSE false END as is_unlocked
+                    r.id, r.name, r.short_description, r.nfc_tag, r.video_url, r.icon_code_point,
+                    CASE WHEN ur.user_id IS NOT NULL THEN true ELSE false END as is_unlocked,
+                    COUNT(DISTINCT i.id) as ingredients_count,
+                    COUNT(DISTINCT s.id) as steps_count
                 FROM recipes r
                 LEFT JOIN unlocked_recipes ur ON r.id = ur.recipe_id AND ur.user_id = %s
+                LEFT JOIN ingredients i ON r.id = i.recipe_id
+                LEFT JOIN steps s ON r.id = s.recipe_id
+                GROUP BY r.id, r.name, r.short_description, r.nfc_tag, r.video_url, r.icon_code_point, ur.user_id
                 ORDER BY r.name
             """, (user_id,))
         else:
             cur.execute("""
                 SELECT 
-                    id, 
-                    name, 
-                    short_description, 
-                    nfc_tag, 
-                    video_url, 
-                    icon_code_point,
-                    false as is_unlocked
-                FROM recipes
-                ORDER BY name
+                    r.id, r.name, r.short_description, r.nfc_tag, r.video_url, r.icon_code_point,
+                    false as is_unlocked,
+                    COUNT(DISTINCT i.id) as ingredients_count,
+                    COUNT(DISTINCT s.id) as steps_count
+                FROM recipes r
+                LEFT JOIN ingredients i ON r.id = i.recipe_id
+                LEFT JOIN steps s ON r.id = s.recipe_id
+                GROUP BY r.id, r.name, r.short_description, r.nfc_tag, r.video_url, r.icon_code_point
+                ORDER BY r.name
             """)
-        
+
         recipes = cur.fetchall()
-        
-        # Pour chaque recette, récupérer ses tags et matériel
+        recipe_ids = [r['id'] for r in recipes]
+
+        if not recipe_ids:
+            return []
+
+        # ✅ 1 seule requête pour TOUS les tags de toutes les recettes
+        cur.execute("""
+            SELECT rt.recipe_id, t.id, t.name
+            FROM tags t
+            JOIN recipe_tags rt ON t.id = rt.tag_id
+            WHERE rt.recipe_id = ANY(%s)
+        """, (recipe_ids,))
+        all_tags = cur.fetchall()
+
+        # ✅ 1 seule requête pour TOUT le matériel de toutes les recettes
+        cur.execute("""
+            SELECT rm.recipe_id, m.id, m.name, m.description, m.image_url, m.category
+            FROM materiel m
+            JOIN recipe_materiel rm ON m.id = rm.materiel_id
+            WHERE rm.recipe_id = ANY(%s)
+            ORDER BY m.category, m.name
+        """, (recipe_ids,))
+        all_materiel = cur.fetchall()
+
+        # Indexer tags et matériel par recipe_id pour accès O(1)
+        tags_by_recipe = {}
+        for tag in all_tags:
+            rid = tag['recipe_id']
+            if rid not in tags_by_recipe:
+                tags_by_recipe[rid] = []
+            tags_by_recipe[rid].append({'id': tag['id'], 'name': tag['name']})
+
+        materiel_by_recipe = {}
+        for mat in all_materiel:
+            rid = mat['recipe_id']
+            if rid not in materiel_by_recipe:
+                materiel_by_recipe[rid] = []
+            materiel_by_recipe[rid].append({
+                'id': mat['id'], 'name': mat['name'],
+                'description': mat['description'],
+                'image_url': mat['image_url'], 'category': mat['category']
+            })
+
         result = []
         for recipe in recipes:
-            # Tags
-            cur.execute("""
-                SELECT t.id, t.name 
-                FROM tags t
-                JOIN recipe_tags rt ON t.id = rt.tag_id
-                WHERE rt.recipe_id = %s
-            """, (recipe['id'],))
-            tags = cur.fetchall()
-            
-            # Matériel (avec gestion d'erreur)
-            materiel = []
-            try:
-                cur.execute("""
-                    SELECT m.id, m.name, m.description, m.image_url, m.category
-                    FROM materiel m
-                    INNER JOIN recipe_materiel rm ON m.id = rm.materiel_id
-                    WHERE rm.recipe_id = %s
-                    ORDER BY m.category, m.name
-                """, (recipe['id'],))
-                materiel = cur.fetchall() or []
-            except Exception as e:
-                print(f"Avertissement: Impossible de récupérer le matériel pour recette {recipe['id']}: {e}")
-                materiel = []
-            
-            # Compter les ingrédients
-            cur.execute("SELECT COUNT(*) as count FROM ingredients WHERE recipe_id = %s", (recipe['id'],))
-            ingredients_count = cur.fetchone()['count']
-            
-            # Compter les étapes
-            cur.execute("SELECT COUNT(*) as count FROM steps WHERE recipe_id = %s", (recipe['id'],))
-            steps_count = cur.fetchone()['count']
-            
+            rid = recipe['id']
             result.append({
                 **recipe,
-                'tags': tags,
-                'materiel': materiel,
-                'ingredients_count': ingredients_count,
-                'steps_count': steps_count
+                'tags': tags_by_recipe.get(rid, []),
+                'materiel': materiel_by_recipe.get(rid, []),
             })
-        
+
         return result
     finally:
         conn.close()
@@ -476,68 +484,57 @@ def get_recipe(recipe_id: int, user_id: Optional[int] = None):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Récupérer la recette
-        cur.execute("SELECT * FROM recipes WHERE id = %s", (recipe_id,))
+
+        # ✅ Recette + statut déverrouillage en une seule requête
+        if user_id is not None:
+            cur.execute("""
+                SELECT r.*,
+                    CASE WHEN ur.user_id IS NOT NULL THEN true ELSE false END as is_unlocked
+                FROM recipes r
+                LEFT JOIN unlocked_recipes ur ON r.id = ur.recipe_id AND ur.user_id = %s
+                WHERE r.id = %s
+            """, (user_id, recipe_id))
+        else:
+            cur.execute("SELECT *, false as is_unlocked FROM recipes WHERE id = %s", (recipe_id,))
+
         recipe = cur.fetchone()
-        
         if not recipe:
             raise HTTPException(status_code=404, detail="Recette non trouvée")
-        
-        # Vérifier si la recette est déverrouillée pour cet utilisateur
-        is_unlocked = False
-        if user_id is not None:
-            cur.execute(
-                "SELECT id FROM unlocked_recipes WHERE user_id = %s AND recipe_id = %s",
-                (user_id, recipe_id)
-            )
-            is_unlocked = cur.fetchone() is not None
-        
-        # Récupérer les ingrédients
+
         cur.execute(
             "SELECT id, name, order_index FROM ingredients WHERE recipe_id = %s ORDER BY order_index",
             (recipe_id,)
         )
         ingredients = cur.fetchall()
-        
-        # Récupérer les étapes
+
         cur.execute(
             "SELECT id, description, order_index FROM steps WHERE recipe_id = %s ORDER BY order_index",
             (recipe_id,)
         )
         steps = cur.fetchall()
-        
-        # Récupérer les tags
+
         cur.execute("""
-            SELECT t.id, t.name 
-            FROM tags t
+            SELECT t.id, t.name FROM tags t
             JOIN recipe_tags rt ON t.id = rt.tag_id
             WHERE rt.recipe_id = %s
         """, (recipe_id,))
         tags = cur.fetchall()
-        
-        # Récupérer le matériel (avec gestion d'erreur)
-        materiel = []
-        try:
-            cur.execute("""
-                SELECT m.id, m.name, m.description, m.image_url, m.category
-                FROM materiel m
-                INNER JOIN recipe_materiel rm ON m.id = rm.materiel_id
-                WHERE rm.recipe_id = %s
-                ORDER BY m.category, m.name
-            """, (recipe_id,))
-            materiel = cur.fetchall() or []
-        except Exception as e:
-            print(f"Avertissement: Impossible de récupérer le matériel pour recette {recipe_id}: {e}")
-            materiel = []
-        
+
+        cur.execute("""
+            SELECT m.id, m.name, m.description, m.image_url, m.category
+            FROM materiel m
+            JOIN recipe_materiel rm ON m.id = rm.materiel_id
+            WHERE rm.recipe_id = %s AND m.is_active = TRUE
+            ORDER BY m.category, m.name
+        """, (recipe_id,))
+        materiel = cur.fetchall() or []
+
         return {
             **recipe,
             'ingredients': ingredients,
             'steps': steps,
             'tags': tags,
             'materiel': materiel,
-            'is_unlocked': is_unlocked
         }
     finally:
         conn.close()
@@ -548,124 +545,44 @@ class UnlockRequest(BaseModel):
 
 @app.post("/unlock")
 def unlock_recipe(unlock_data: UnlockRequest):
-    """Déverrouiller une recette via tag NFC (PUBLIC) - AVEC DEBUG"""
-    
-    # 🔍 LOGS DE DEBUG DÉTAILLÉS
-    print("\n" + "="*70)
-    print("🔍 DÉVERROUILLAGE NFC - DEBUG COMPLET")
-    print("="*70)
-    print(f"📥 Données reçues : {unlock_data}")
-    print(f"📝 Tag NFC reçu brut : '{unlock_data.nfc_tag}'")
-    print(f"📝 Longueur du tag : {len(unlock_data.nfc_tag)} caractères")
-    print(f"📝 User ID : {unlock_data.user_id}")
-    print(f"📝 Type du tag : {type(unlock_data.nfc_tag)}")
-    print(f"📝 Repr du tag : {repr(unlock_data.nfc_tag)}")
-    print(f"📝 Bytes du tag : {unlock_data.nfc_tag.encode('utf-8')}")
-    print("="*70)
-    
-    nfc_tag_original = unlock_data.nfc_tag
+    """Déverrouiller une recette via tag NFC (PUBLIC)"""
     nfc_tag_cleaned = unlock_data.nfc_tag.strip().lower()
     user_id = unlock_data.user_id
-    
-    print(f"🧹 Tag après nettoyage : '{nfc_tag_cleaned}'")
-    print(f"🧹 Longueur après nettoyage : {len(nfc_tag_cleaned)}")
-    
+
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Vérifier que l'utilisateur existe
-        print(f"\n👤 Vérification utilisateur ID {user_id}...")
-        cur.execute("SELECT id, email FROM app_users WHERE id = %s", (user_id,))
-        user = cur.fetchone()
-        if not user:
-            print(f"❌ Utilisateur {user_id} non trouvé !")
+
+        cur.execute("SELECT id FROM app_users WHERE id = %s", (user_id,))
+        if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-        print(f"✅ Utilisateur trouvé : {user['email']}")
-        
-        # 🔍 AFFICHER TOUTES LES RECETTES EN BASE
-        print("\n📚 LISTE DES RECETTES EN BASE DE DONNÉES :")
-        print("-" * 70)
-        cur.execute("SELECT id, name, nfc_tag FROM recipes")
-        all_recipes = cur.fetchall()
-        for recipe in all_recipes:
-            tag_in_db = recipe['nfc_tag']
-            print(f"  ID: {recipe['id']:3d} | Nom: {recipe['name']:30s} | Tag: '{tag_in_db}' (len={len(tag_in_db)})")
-            print(f"       → Repr: {repr(tag_in_db)}")
-            print(f"       → Bytes: {tag_in_db.encode('utf-8')}")
-            print(f"       → Lower+Strip: '{tag_in_db.strip().lower()}'")
-        print("-" * 70)
-        
-        # Trouver la recette correspondant au tag NFC (insensible à la casse)
-        print(f"\n🔍 RECHERCHE de la recette avec tag : '{nfc_tag_cleaned}'")
+
         cur.execute(
-            "SELECT id, name, nfc_tag FROM recipes WHERE LOWER(TRIM(nfc_tag)) = %s", 
+            "SELECT id, name FROM recipes WHERE LOWER(TRIM(nfc_tag)) = %s",
             (nfc_tag_cleaned,)
         )
         recipe = cur.fetchone()
-        
+
         if not recipe:
-            print("❌ AUCUNE RECETTE TROUVÉE !")
-            print(f"❌ Tag recherché (nettoyé) : '{nfc_tag_cleaned}'")
-            print(f"❌ Tag recherché (original) : '{nfc_tag_original}'")
-            print("\n💡 COMPARAISON DÉTAILLÉE :")
-            for db_recipe in all_recipes:
-                db_tag = db_recipe['nfc_tag'].strip().lower()
-                print(f"  Base : '{db_tag}' vs Recherché : '{nfc_tag_cleaned}'")
-                print(f"    → Match exact ? {db_tag == nfc_tag_cleaned}")
-                if db_tag != nfc_tag_cleaned:
-                    print(f"    → Différence caractère par caractère :")
-                    max_len = max(len(db_tag), len(nfc_tag_cleaned))
-                    for i in range(max_len):
-                        char_db = db_tag[i] if i < len(db_tag) else "∅"
-                        char_search = nfc_tag_cleaned[i] if i < len(nfc_tag_cleaned) else "∅"
-                        if char_db != char_search:
-                            print(f"      Position {i}: '{char_db}' (ord={ord(char_db) if char_db != '∅' else 'N/A'}) != '{char_search}' (ord={ord(char_search) if char_search != '∅' else 'N/A'})")
-            print("="*70 + "\n")
             raise HTTPException(
-                status_code=404, 
-                detail=f"Ce tag NFC '{nfc_tag_original}' ne correspond à aucune recette"
+                status_code=404,
+                detail=f"Ce tag NFC ne correspond à aucune recette"
             )
-        
-        print(f"✅ RECETTE TROUVÉE !")
-        print(f"   ID : {recipe['id']}")
-        print(f"   Nom : {recipe['name']}")
-        print(f"   Tag en base : '{recipe['nfc_tag']}'")
-        
-        recipe_id = recipe['id']
-        recipe_name = recipe['name']
-        
-        # Vérifier si la recette n'est pas déjà déverrouillée
-        print(f"\n🔓 Vérification déverrouillage pour user {user_id}...")
-        cur.execute(
-            "SELECT id FROM unlocked_recipes WHERE user_id = %s AND recipe_id = %s",
-            (user_id, recipe_id)
-        )
-        
-        if cur.fetchone():
-            print(f"ℹ️ Recette déjà déverrouillée")
-            print("="*70 + "\n")
-            return {
-                "message": f"La recette '{recipe_name}' était déjà déverrouillée",
-                "recipe_id": recipe_id,
-                "already_unlocked": True
-            }
-        
-        # Déverrouiller la recette
-        print(f"🔓 Déverrouillage de la recette...")
-        cur.execute(
-            "INSERT INTO unlocked_recipes (user_id, recipe_id) VALUES (%s, %s)",
-            (user_id, recipe_id)
-        )
+
+        # ✅ INSERT ON CONFLICT — évite la double vérification SELECT + INSERT
+        cur.execute("""
+            INSERT INTO unlocked_recipes (user_id, recipe_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (user_id, recipe['id']))
+
+        already_unlocked = cur.rowcount == 0
         conn.commit()
-        
-        print(f"✅ Recette '{recipe_name}' déverrouillée avec succès pour user {user_id}")
-        print("="*70 + "\n")
-        
+
         return {
-            "message": f"Recette '{recipe_name}' déverrouillée avec succès !",
-            "recipe_id": recipe_id,
-            "already_unlocked": False
+            "message": f"Recette '{recipe['name']}' {'était déjà déverrouillée' if already_unlocked else 'déverrouillée avec succès !'}",
+            "recipe_id": recipe['id'],
+            "already_unlocked": already_unlocked
         }
     finally:
         conn.close()
@@ -690,53 +607,41 @@ def create_recipe(recipe: RecipeCreate, current_user: str = Depends(get_current_
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Vérifier que le tag NFC n'existe pas déjà
+
         cur.execute("SELECT id FROM recipes WHERE nfc_tag = %s", (recipe.nfc_tag,))
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Ce tag NFC est déjà utilisé")
-        
-        # Insérer la recette
+
         cur.execute("""
             INSERT INTO recipes (name, short_description, nfc_tag, video_url, icon_code_point)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
         """, (recipe.name, recipe.short_description, recipe.nfc_tag, recipe.video_url, recipe.icon_code_point))
-        
+
         recipe_id = cur.fetchone()['id']
-        
-        # Insérer les ingrédients
-        for i, ingredient_name in enumerate(recipe.ingredients):
-            cur.execute(
+
+        # ✅ executemany — 1 seul appel réseau par type
+        if recipe.ingredients:
+            cur.executemany(
                 "INSERT INTO ingredients (recipe_id, name, order_index) VALUES (%s, %s, %s)",
-                (recipe_id, ingredient_name, i)
+                [(recipe_id, name, i) for i, name in enumerate(recipe.ingredients)]
             )
-        
-        # Insérer les étapes
-        for i, step_description in enumerate(recipe.steps):
-            cur.execute(
+        if recipe.steps:
+            cur.executemany(
                 "INSERT INTO steps (recipe_id, description, order_index) VALUES (%s, %s, %s)",
-                (recipe_id, step_description, i)
+                [(recipe_id, desc, i) for i, desc in enumerate(recipe.steps)]
             )
-        
-        # Insérer les tags
-        for tag_id in recipe.tag_ids:
-            cur.execute(
+        if recipe.tag_ids:
+            cur.executemany(
                 "INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (%s, %s)",
-                (recipe_id, tag_id)
+                [(recipe_id, tag_id) for tag_id in recipe.tag_ids]
             )
-        
-        # Insérer le matériel si fourni
         if recipe.materiel_ids:
-            for materiel_id in recipe.materiel_ids:
-                cur.execute(
-                    "INSERT INTO recipe_materiel (recipe_id, materiel_id) VALUES (%s, %s)",
-                    (recipe_id, materiel_id)
-                )
-        
+            cur.executemany(
+                "INSERT INTO recipe_materiel (recipe_id, materiel_id) VALUES (%s, %s)",
+                [(recipe_id, mat_id) for mat_id in recipe.materiel_ids]
+            )
+
         conn.commit()
-        
-        # Récupérer la recette complète
         return get_recipe(recipe_id)
     finally:
         conn.close()
@@ -747,84 +652,68 @@ def update_recipe(recipe_id: int, recipe: RecipeUpdate, current_user: str = Depe
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        
-        # Vérifier que la recette existe
+
         cur.execute("SELECT id FROM recipes WHERE id = %s", (recipe_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Recette non trouvée")
-        
-        # Mettre à jour les champs de base
+
         update_fields = []
         update_values = []
-        
+
         if recipe.name is not None:
             update_fields.append("name = %s")
             update_values.append(recipe.name)
-        
         if recipe.short_description is not None:
             update_fields.append("short_description = %s")
             update_values.append(recipe.short_description)
-        
         if recipe.nfc_tag is not None:
-            # Vérifier que le tag NFC n'est pas déjà utilisé par une autre recette
             cur.execute("SELECT id FROM recipes WHERE nfc_tag = %s AND id != %s", (recipe.nfc_tag, recipe_id))
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Ce tag NFC est déjà utilisé")
             update_fields.append("nfc_tag = %s")
             update_values.append(recipe.nfc_tag)
-        
         if recipe.video_url is not None:
             update_fields.append("video_url = %s")
             update_values.append(recipe.video_url)
-        
         if recipe.icon_code_point is not None:
             update_fields.append("icon_code_point = %s")
             update_values.append(recipe.icon_code_point)
-        
+
         if update_fields:
             update_values.append(recipe_id)
-            query = f"UPDATE recipes SET {', '.join(update_fields)} WHERE id = %s"
-            cur.execute(query, update_values)
-        
-        # Mettre à jour les ingrédients
+            cur.execute(f"UPDATE recipes SET {', '.join(update_fields)} WHERE id = %s", update_values)
+
+        # ✅ executemany pour tous les sous-éléments
         if recipe.ingredients is not None:
             cur.execute("DELETE FROM ingredients WHERE recipe_id = %s", (recipe_id,))
-            for i, ingredient_name in enumerate(recipe.ingredients):
-                cur.execute(
+            if recipe.ingredients:
+                cur.executemany(
                     "INSERT INTO ingredients (recipe_id, name, order_index) VALUES (%s, %s, %s)",
-                    (recipe_id, ingredient_name, i)
+                    [(recipe_id, name, i) for i, name in enumerate(recipe.ingredients)]
                 )
-        
-        # Mettre à jour les étapes
         if recipe.steps is not None:
             cur.execute("DELETE FROM steps WHERE recipe_id = %s", (recipe_id,))
-            for i, step_description in enumerate(recipe.steps):
-                cur.execute(
+            if recipe.steps:
+                cur.executemany(
                     "INSERT INTO steps (recipe_id, description, order_index) VALUES (%s, %s, %s)",
-                    (recipe_id, step_description, i)
+                    [(recipe_id, desc, i) for i, desc in enumerate(recipe.steps)]
                 )
-        
-        # Mettre à jour les tags
         if recipe.tag_ids is not None:
             cur.execute("DELETE FROM recipe_tags WHERE recipe_id = %s", (recipe_id,))
-            for tag_id in recipe.tag_ids:
-                cur.execute(
+            if recipe.tag_ids:
+                cur.executemany(
                     "INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (%s, %s)",
-                    (recipe_id, tag_id)
+                    [(recipe_id, tag_id) for tag_id in recipe.tag_ids]
                 )
-        
-        # Mettre à jour le matériel si fourni
         if recipe.materiel_ids is not None:
             cur.execute("DELETE FROM recipe_materiel WHERE recipe_id = %s", (recipe_id,))
-            for materiel_id in recipe.materiel_ids:
-                cur.execute(
+            if recipe.materiel_ids:
+                cur.executemany(
                     "INSERT INTO recipe_materiel (recipe_id, materiel_id) VALUES (%s, %s)",
-                    (recipe_id, materiel_id)
+                    [(recipe_id, mat_id) for mat_id in recipe.materiel_ids]
                 )
-        
+
         conn.commit()
-        
-        # Récupérer la recette complète mise à jour
         return get_recipe(recipe_id)
     finally:
         conn.close()
